@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parade Pilot · Maps Parade mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#fff;--fg:#1f1f1f;--muted:#5f6368;--line:#e3e3e3;--soft:#f1f3f4;--accent:#1a73e8;--accent-soft:#e8f0fe;
+--parade:#d93025;--parade-soft:#fce8e6;--ok:#188038;--ok-soft:#e6f4ea;--warn:#b06000;--warn-soft:#fef7e0;
+--mono:"IBM Plex Mono",ui-monospace,monospace;--body:"Inter",system-ui,sans-serif}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(--fg);background:var(--soft)}
+#map{position:absolute;inset:0}
+#panel{position:absolute;top:12px;left:12px;bottom:12px;width:410px;max-width:calc(100% - 24px);background:var(--bg);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden;z-index:2}
+@media (max-width:700px){#panel{top:auto;height:62%;left:8px;right:8px;bottom:8px;width:auto}}
+.top{padding:14px 14px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand b{font-size:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer;font-family:var(--body)}
+.chip.on{background:var(--parade-soft);border-color:var(--parade);color:var(--parade)}
+.chip.watch{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);cursor:default}
+.chip.here{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);cursor:default}
+.brand>span{flex-wrap:wrap;justify-content:flex-end}
+.loc{font:600 11.5px var(--body);border:0;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:4px 9px;cursor:pointer;flex:none}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 10px;background:var(--bg)}
+.field span{font-size:11px;color:var(--muted);width:34px;flex:none}
+.field input{border:0;outline:0;padding:9px 0;font:inherit;flex:1;min-width:0;background:transparent;color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .field{flex:1;min-width:120px}
+.btn{font:600 13.5px var(--body);border-radius:999px;padding:8px 16px;cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.presets button{font:500 12px var(--body);border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:4px 10px;cursor:pointer;color:var(--fg)}
+#feed{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+.msg{border-radius:12px;padding:9px 11px;line-height:1.45;max-width:94%}
+.user{align-self:flex-end;background:var(--accent);color:#fff}
+.asst{align-self:flex-start;background:var(--soft)}
+.push{background:var(--parade-soft);border:1px solid var(--parade)}
+.who{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;opacity:.7;margin-bottom:2px}
+.tool{font-family:var(--mono);font-size:11.5px;background:#f8f9fa;border:1px solid var(--line);border-radius:8px;padding:7px 9px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted)}
+.tool b{color:var(--accent);font-weight:500}
+.tag{font:600 10px var(--mono);padding:2px 6px;border-radius:4px;margin-right:6px;letter-spacing:.04em}
+.t-auto{background:var(--accent-soft);color:var(--accent)}.t-block{background:var(--parade-soft);color:var(--parade)}
+.t-ask{background:var(--warn-soft);color:var(--warn)}.t-ok{background:var(--ok-soft);color:var(--ok)}
+.card{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-size:13px;padding:6px 8px;border-radius:8px;cursor:pointer}
+.opt:hover{background:var(--soft)}
+.opt.best{background:var(--accent-soft)}
+.opt.bad{color:var(--muted)}
+.opt small{color:var(--muted)}
+.approve{border:1.5px solid var(--warn);background:var(--warn-soft);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.ask{display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--line)}
+.ask input{flex:1;min-width:0;border:1px solid var(--line);border-radius:999px;padding:9px 14px;font:inherit}
+#sim{position:absolute;right:12px;bottom:24px;z-index:2;background:var(--bg);border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.18);padding:10px 12px;width:260px;display:flex;flex-direction:column;gap:6px}
+@media (max-width:700px){#sim{top:12px;bottom:auto;right:8px;width:220px}}
+#sim h4{margin:0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#sim label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;cursor:pointer}
+#gate{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(255,255,255,.92);padding:20px;text-align:center}
+#gate div{max-width:440px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<aside id="panel">
+  <div class="top">
+    <div class="brand">
+      <b>Maps</b>
+      <span style="display:flex;gap:6px">
+        <button class="chip on" id="paradeMode" aria-pressed="true"><span class="dot"></span>Parade mode</button>
+        <span class="chip watch" id="watchChip" hidden><span class="dot"></span>Watching trip</span>
+        <span class="chip here" id="locChip" hidden></span>
+      </span>
+    </div>
+    <div class="field"><span>From</span><input id="from" value="W 79th St & Amsterdam Ave, New York, NY"><button class="loc" id="locBtn" type="button">Use my location</button></div>
+    <div class="field"><span>To</span><input id="to" value="Moynihan Train Hall, New York, NY"></div>
+    <div class="row">
+      <div class="field"><span>Leave</span><input id="leave" type="time" value="09:45"></div>
+      <div class="field"><span>By</span><input id="by" type="time" value="10:45"></div>
+    </div>
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <label style="font-size:12.5px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="rides" checked>Offer rides (I approve)</label>
+      <button class="btn primary" id="plan">Plan with Parade Pilot</button>
+    </div>
+    <div class="presets">
+      <button data-p="0">Penn Station · 11:05 train</button>
+      <button data-p="1">Watch from 72nd &amp; CPW</button>
+      <button data-p="2">Dinner in Brooklyn</button>
+    </div>
+  </div>
+  <div id="feed" aria-live="polite"></div>
+  <form class="ask" id="askForm">
+    <input id="ask" placeholder="Ask: from Times Square to Park Slope by 1pm">
+    <button class="btn" type="submit">Send</button>
+  </form>
+</aside>
+
+<div id="sim">
+  <h4>Live city feed (simulate)</h4>
+  <label><input type="checkbox" data-d="parade" checked>Parade route closed, 9 AM–noon</label>
+  <label><input type="checkbox" data-d="staging" checked>Balloon staging zone (77th–81st, CPW)</label>
+  <label><input type="checkbox" data-d="penn7">34 St–Penn (7th Ave) access restricted</label>
+  <label><input type="checkbox" data-d="crowd34">Heavy crowds on 34th St, 6th–8th Ave</label>
+  <label><input type="checkbox" data-d="ac">A/C/E running 15 min late</label>
+  <label><input type="checkbox" data-d="l123">1/2/3 suspended</label>
+  <h4 style="margin-top:6px">My location</h4>
+  <form id="hereForm" style="display:flex;gap:6px">
+    <input id="hereInput" placeholder="Type where you are" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px">
+    <button class="loc" type="submit">Set</button>
+  </form>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <button class="loc" type="button" id="pickBtn">Pick on map</button>
+    <button class="loc" type="button" id="liveBtn">Use GPS</button>
+  </div>
+  <label><input type="checkbox" id="clickLoc">Keep moving me with each map click</label>
+</div>
+
+<div id="gate"><div id="gateMsg"></div></div>
+
+<script src="config.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const TZ = 'America/New_York', DAY = '2026-11-26';
+// Approximate 100th parade route: CPW & 77th → Columbus Circle → Central Park S → 6th Ave → 34th St (Herald Sq)
+const PARADE = [[40.7794,-73.9724],[40.7720,-73.9778],[40.7681,-73.9819],[40.7665,-73.9792],[40.7651,-73.9761],[40.7600,-73.9798],[40.7547,-73.9840],[40.7497,-73.9877],[40.7510,-73.9905]].map(([lat,lng])=>({lat,lng}));
+const LANDMARKS = [['CPW & 77th St',PARADE[0]],['Columbus Circle',PARADE[2]],['Central Park S & 6th Ave',PARADE[4]],['6th Ave & 42nd St',PARADE[6]],['Herald Square',PARADE[7]],['34th St & 7th Ave',PARADE[8]]];
+const D = {
+  parade:{on:true}, staging:{on:true, c:{lat:40.7813,lng:-73.9740}, r:230, label:'balloon staging zone by the Natural History Museum'},
+  penn7:{on:false, c:{lat:40.7506,lng:-73.9908}, r:110, label:'34 St–Penn Station (7th Ave) access restricted'},
+  crowd34:{on:false, c:{lat:40.7503,lng:-73.9905}, r:260, label:'heavy crowds on 34th St'},
+  ac:{on:false, lines:['A','C','E'], min:15, label:'A/C/E running 15 min late'},
+  l123:{on:false, lines:['1','2','3'], label:'1/2/3 suspended'}
+};
+const PRESETS = [
+  {from:'W 79th St & Amsterdam Ave, New York, NY', to:'Moynihan Train Hall, New York, NY', leave:'09:45', by:'10:45', say:"I have an 11:05 Amtrak from Penn. Get me there with time to spare, I hate crowds."},
+  {from:'Grand Army Plaza, Brooklyn, NY', to:'W 72nd St & Central Park West, New York, NY', leave:'07:15', by:'08:30', say:"Get me to a viewing spot at 72nd & Central Park West before the parade starts."},
+  {from:'Times Square, New York, NY', to:'Park Slope, Brooklyn, NY', leave:'11:30', by:'13:00', say:"I'm at Times Square and need to get to Thanksgiving dinner in Park Slope by 1."}
+];
+
+let map, layers = [], state = {watching:false, last:null, req:null, choice:null};
+
+// ---------- geometry (meters, local projection) ----------
+const P = p => ({x:(p.lng+73.98)*Math.cos(40.76*Math.PI/180)*111320, y:(p.lat-40.76)*110540});
+const dist = (a,b)=>{a=P(a);b=P(b);return Math.hypot(a.x-b.x,a.y-b.y)};
+function segDist(p,a,b){p=P(p);a=P(a);b=P(b);const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy||1;let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/l;t=Math.max(0,Math.min(1,t));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
+function cross(a,b,c,d){a=P(a);b=P(b);c=P(c);d=P(d);const o=(p,q,r)=>Math.sign((q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x));return o(a,b,c)!==o(a,b,d)&&o(c,d,a)!==o(c,d,b)}
+const paradeDist = p => Math.min(...PARADE.slice(1).map((b,i)=>segDist(p,PARADE[i],b)));
+const nearestLandmark = p => LANDMARKS.reduce((m,l)=>dist(p,l[1])<dist(p,m[1])?l:m)[0];
+function decode(s){let i=0,lat=0,lng=0,o=[];while(i<s.length){for(const k of [0,1]){let b,sh=0,r=0;do{b=s.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);const v=r&1?~(r>>1):r>>1;if(k===0)lat+=v;else lng+=v}o.push({lat:lat/1e5,lng:lng/1e5})}return o}
+
+// ---------- routing: Routes API, falling back to Maps JS DirectionsService ----------
+async function routesApi(from,to,mode,dep){
+  const body={origin:wp(from),destination:wp(to),travelMode:mode,computeAlternativeRoutes:true,departureTime:dep.toISOString()};
+  if(mode==='DRIVE') body.routingPreference='TRAFFIC_AWARE';
+  const r=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':window.PP_KEY,
+    'X-Goog-FieldMask':'routes.duration,routes.distanceMeters,routes.legs.steps.travelMode,routes.legs.steps.polyline.encodedPolyline,routes.legs.steps.staticDuration,routes.legs.steps.distanceMeters,routes.legs.steps.transitDetails'},body:JSON.stringify(body)});
+  const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
+  const ll=l=>({lat:l.latLng.latitude,lng:l.latLng.longitude});
+  return (j.routes||[]).map(rt=>({api:'Routes API',sec:parseInt(rt.duration),meters:rt.distanceMeters||0,steps:rt.legs.flatMap(l=>l.steps||[]).map(s=>{
+    const t=s.transitDetails, st={mode:s.travelMode,path:decode(s.polyline?.encodedPolyline||''),sec:parseInt(s.staticDuration||'0'),m:s.distanceMeters||0};
+    if(t){st.line=t.transitLine?.nameShort||t.transitLine?.name||'transit';st.color=t.transitLine?.color;st.dep={name:t.stopDetails?.departureStop?.name,loc:ll(t.stopDetails.departureStop.location)};st.arr={name:t.stopDetails?.arrivalStop?.name,loc:ll(t.stopDetails.arrivalStop.location)}}
+    return st})}));
+}
+function directionsJs(from,to,mode,dep){
+  return new Promise((res,rej)=>new google.maps.DirectionsService().route({origin:from,destination:to,provideRouteAlternatives:true,
+    travelMode:mode==='DRIVE'?'DRIVING':'TRANSIT',transitOptions:{departureTime:dep},drivingOptions:{departureTime:dep}},(r,s)=>{
+    if(s!=='OK') return rej(new Error(s));
+    res(r.routes.map(rt=>{const leg=rt.legs[0];return {api:'Directions (JS)',sec:leg.duration.value,meters:leg.distance.value,steps:leg.steps.map(s=>{
+      const st={mode:{WALKING:'WALK',DRIVING:'DRIVE',TRANSIT:'TRANSIT'}[s.travel_mode]||s.travel_mode,path:s.path.map(p=>({lat:p.lat(),lng:p.lng()})),sec:s.duration.value,m:s.distance.value};
+      if(s.transit){const t=s.transit;st.line=t.line.short_name||t.line.name;st.color=t.line.color;st.dep={name:t.departure_stop.name,loc:t.departure_stop.location.toJSON()};st.arr={name:t.arrival_stop.name,loc:t.arrival_stop.location.toJSON()}}
+      return st})}}))}));
+}
+async function getRoutes(from,to,mode,dep){
+  try{return await routesApi(from,to,mode,dep)}catch(e){console.warn('Routes API failed, trying Directions',e);return await directionsJs(from,to,mode,dep)}
+}
+
+// ---------- the agent's judgement: check a route against live disruptions ----------
+function assess(rt,req){
+  const issues=[]; let delay=0;
+  const origin=rt.steps[0]?.path[0], dest=rt.steps.at(-1)?.path.at(-1);
+  const nearEnds=p=>(origin&&dist(p,origin)<150)||(dest&&dist(p,dest)<150);
+  const circles=['staging','penn7','crowd34'].filter(k=>D[k].on);
+  const transit=rt.steps.filter(s=>s.mode==='TRANSIT');
+  rt.steps.forEach(s=>{
+    if(s.mode==='TRANSIT'){
+      const L=D.l123.on&&D.l123.lines.includes(s.line); if(L) issues.push(`uses the ${s.line} train, which is suspended`);
+      if(D.ac.on&&D.ac.lines.includes(s.line)) delay+=D.ac.min*60;
+      return;
+    }
+    if(D.parade.on){
+      for(let i=1;i<s.path.length;i++){const a=s.path[i-1],b=s.path[i]; if(nearEnds(b)) continue;
+        if(PARADE.slice(1).some((q,j)=>cross(a,b,PARADE[j],q))||paradeDist(b)<35){issues.push(`${s.mode==='DRIVE'?'drives':'walks'} across the parade route near ${nearestLandmark(b)}`);break}}
+    }
+    for(const k of circles){ if(s.path.some(p=>!nearEnds(p)&&dist(p,D[k].c)<D[k].r)){issues.push(`goes through the ${D[k].label}`);} }
+  });
+  // where you come up to the street matters: first boarding and last exit stations
+  const ends=[transit[0]?.dep,transit.at(-1)?.arr].filter(Boolean);
+  ends.forEach(stop=>{
+    if(D.parade.on&&paradeDist(stop.loc)<70&&!nearEnds(stop.loc)) issues.push(`uses ${stop.name} station, whose exits are on the parade route`);
+    for(const k of circles) if(dist(stop.loc,D[k].c)<D[k].r&&!nearEnds(stop.loc)) issues.push(`uses ${stop.name} station: ${D[k].label}`);
+  });
+  const arrive=new Date(req.dep.getTime()+(rt.sec+delay)*1000);
+  return {...rt,issues:[...new Set(issues)],delay,arrive,ok:issues.length===0};
+}
+
+// ---------- UI helpers ----------
+const t = d => d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:TZ});
+const mins = s => Math.round(s/60);
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function add(html){const d=document.createElement('div');d.innerHTML=html;const el=d.firstElementChild;$('feed').appendChild(el);$('feed').scrollTop=1e9;return el}
+const say=(who,txt,cls)=>add(`<div class="msg ${cls}"><div class="who">${who}</div>${txt}</div>`);
+const toolLine=(name,args,res)=>add(`<div class="tool"><b>→ ${name}</b>(${esc(args)})${res?`\n← ${esc(res)}`:''}</div>`);
+const logLine=(cls,tag,txt)=>add(`<div style="font-size:12.5px"><span class="tag ${cls}">${tag}</span>${txt}</div>`);
+function describe(r){
+  const parts=[]; let walk=0;
+  r.steps.forEach(s=>{ if(s.mode==='WALK'){walk+=s.sec} else { if(walk>45)parts.push(`walk ${mins(walk)} min`);walk=0;
+    parts.push(s.mode==='TRANSIT'?`take the <b>${esc(s.line)}</b> from ${esc(s.dep.name)} to ${esc(s.arr.name)}`:`ride ${mins(s.sec)} min`)}});
+  if(walk>45)parts.push(`walk ${mins(walk)} min`);
+  return parts.join(', then ');
+}
+const summary = r => r.steps.filter(s=>s.mode==='TRANSIT').map(s=>s.line).join(' → ')||(r.steps.some(s=>s.mode==='DRIVE')?'Car':'Walk');
+
+function draw(best,others,ride){
+  layers.forEach(l=>l.setMap(null)); layers=[];
+  const add=o=>{layers.push(o);return o};
+  if(D.parade.on) add(new google.maps.Polyline({map,path:PARADE,strokeColor:'#d93025',strokeWeight:9,strokeOpacity:.7,zIndex:1}));
+  ['staging','penn7','crowd34'].forEach(k=>D[k].on&&add(new google.maps.Circle({map,center:D[k].c,radius:D[k].r,strokeColor:'#d93025',strokeWeight:1.5,fillColor:'#d93025',fillOpacity:.15,zIndex:1})));
+  (others||[]).forEach(r=>r.steps.forEach(s=>add(new google.maps.Polyline({map,path:s.path,strokeColor:r.ok?'#7baaf7':'#d93025',strokeOpacity:r.ok?.55:.45,strokeWeight:4,zIndex:2}))));
+  const show=ride||best; if(!show) return;
+  const b=new google.maps.LatLngBounds();
+  show.steps.forEach(s=>{s.path.forEach(p=>b.extend(p));
+    const walk=s.mode==='WALK';
+    add(new google.maps.Polyline({map,path:s.path,zIndex:3,strokeWeight:walk?0:6,strokeColor:s.mode==='DRIVE'?'#188038':'#1a73e8',strokeOpacity:walk?0:1,
+      icons:walk?[{icon:{path:google.maps.SymbolPath.CIRCLE,scale:2.6,fillOpacity:1,fillColor:'#5f6368',strokeOpacity:0},offset:'0',repeat:'10px'}]:[]}));
+    if(s.mode==='TRANSIT') [s.dep,s.arr].forEach(st=>add(new google.maps.Marker({map,position:st.loc,title:st.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:5,fillColor:'#fff',fillOpacity:1,strokeColor:'#1a73e8',strokeWeight:3},zIndex:4})));
+  });
+  const s0=show.steps[0].path[0], e=show.steps.at(-1).path.at(-1);
+  add(new google.maps.Marker({map,position:s0,label:{text:'A',color:'#fff'},zIndex:5}));
+  add(new google.maps.Marker({map,position:e,label:{text:'B',color:'#fff'},zIndex:5}));
+  map.fitBounds(b,{left:440,top:40,right:290,bottom:40});
+}
+
+// ---------- the agent loop ----------
+async function plan(reason){
+  const req={from:originValue(),to:$('to').value.trim(),dep:new Date(`${DAY}T${$('leave').value}:00-05:00`),by:$('by').value?new Date(`${DAY}T${$('by').value}:00-05:00`):null,rides:$('rides').checked};
+  if(!req.from||!req.to) return;
+  state.req=req; state.choice=null;
+  toolLine(reason?'watch_trip → plan_parade_trip':'plan_parade_trip',`origin: "${placeLabel(req.from)}", destination: "${req.to}", depart: ${t(req.dep)}${req.by?`, arrive_by: ${t(req.by)}`:''}`);
+  let routes;
+  try{ routes=(await getRoutes(req.from,req.to,'TRANSIT',req.dep)).map(r=>assess(r,req)); }
+  catch(e){ say('Parade Pilot',`I couldn't get routes: ${esc(e.message)}. Check that the Routes API (or Directions API) is enabled for this key.`,'asst'); return; }
+  const active=Object.entries(D).filter(([,v])=>v.on).length;
+  toolLine('check_disruptions',`${active} active in area`,`${routes.length} transit options from ${routes[0]?.api||'—'} · ${routes.filter(r=>r.ok).length} pass parade checks`);
+  const good=routes.filter(r=>r.ok).sort((a,b)=>a.arrive-b.arrive), best=good[0];
+  const prev=state.last;
+  state.last=best;
+  // options card
+  const card=add(`<div class="card"><div class="who" style="color:var(--muted)">Options checked</div></div>`);
+  routes.sort((a,b)=>b.ok-a.ok||a.arrive-b.arrive).forEach(r=>{
+    const o=document.createElement('div'); o.className='opt'+(r===best?' best':'')+(r.ok?'':' bad');
+    o.innerHTML=`<span>${r.ok?'':'✕ '}${esc(summary(r))}${r.ok?'':`<br><small>${esc(r.issues[0])}</small>`}</span><small>${t(r.arrive)}${r.delay?` (+${mins(r.delay)})`:''}</small>`;
+    o.onclick=()=>draw(r,routes.filter(x=>x!==r)); card.appendChild(o);
+  });
+  routes.filter(r=>!r.ok).forEach(r=>logLine('t-block','AVOIDED',`${esc(summary(r))}: ${esc(r.issues.join('; '))}`));
+  draw(best,routes.filter(r=>r!==best));
+  if(best){
+    const spare=req.by?mins((req.by-best.arrive)/1000):null;
+    const changed=reason&&prev&&summary(prev)!==summary(best);
+    say('Parade Pilot',`${reason?`<b>${esc(reason)}.</b> `:''}${changed?'I changed your route. ':''}${reason&&!changed?'Your route still works. ':''}Leave at ${t(req.dep)}: ${describe(best)}. You'll arrive around <b>${t(best.arrive)}</b>${spare!==null?` (${spare>=0?spare+' min to spare':Math.abs(spare)+' min late'})`:''}.`,'asst');
+    logLine('t-auto','AUTO',changed?`Rerouted to ${esc(summary(best))}, no cost, within your rules`:`Planned ${esc(summary(best))} and started watching the trip`);
+  } else say('Parade Pilot',`Every transit option runs into a closure right now.`,'asst');
+  state.watching=true; $('watchChip').hidden=false;
+  const tight = !best || (req.by && (req.by-best.arrive)/60000 < 15);
+  if(req.rides && tight) await offerRide(req,best);
+}
+
+async function offerRide(req,best){
+  let rides;
+  try{ rides=(await getRoutes(req.from,req.to,'DRIVE',req.dep)).map(r=>assess(r,req)); }catch(e){ return; }
+  const ride=rides.filter(r=>r.ok).sort((a,b)=>a.arrive-b.arrive)[0];
+  if(!ride){ logLine('t-block','AVOIDED','No car route avoids the parade right now'); return; }
+  if(best && ride.arrive>=best.arrive) return;
+  const mi=ride.meters/1609, fare=Math.round(4+2.2*mi+0.6*mins(ride.sec));
+  toolLine('book_ride',`route: parade-safe, max_price: ${fare+5}`,'requires_confirmation: true · held for traveler');
+  logLine('t-ask','ASKED',`Ride held for your approval because it costs money`);
+  const el=add(`<div class="approve"><div><b>Approval needed.</b> ${best?`Transit gets you there at ${t(best.arrive)}, which is tight.`:'Transit is blocked.'} A car on a parade-safe route arrives around <b>${t(ride.arrive)}</b> for about <b>$${fare}</b> (estimate). Book it?</div>
+    <div class="row"><button class="btn go">Book ride</button><button class="btn">Keep ${best?'transit':'waiting'}</button><button class="btn" data-peek>Show on map</button></div></div>`);
+  const [yes,no,peek]=el.querySelectorAll('button');
+  peek.onclick=()=>draw(best,[],ride);
+  yes.onclick=()=>{el.querySelectorAll('button').forEach(b=>b.disabled=true);draw(null,[],ride);state.last=ride;
+    toolLine('book_ride','confirmed_by_user: true',`Booked (simulated) · ~$${fare}`);logLine('t-ok','APPROVED',`You approved a ride, about $${fare}, arriving ${t(ride.arrive)}`);
+    say('Parade Pilot',`Booked. Your driver takes a route that avoids every closure. I'll keep watching.`,'asst')};
+  no.onclick=()=>{el.querySelectorAll('button').forEach(b=>b.disabled=true);draw(best,[]);logLine('t-ok','DECLINED','You kept transit. Nothing was booked or charged.')};
+}
+
+// ---------- live location ----------
+let hereMarker=null, hereCircle=null, watchId=null, lastReplan=0;
+const alerted=new Set();
+function wp(v){return typeof v==='string'?{address:v}:{location:{latLng:{latitude:v.lat,longitude:v.lng}}}}
+function originValue(){return state.useHere&&state.here?{lat:state.here.lat,lng:state.here.lng}:$('from').value.trim()}
+function placeLabel(v){return typeof v==='string'?v:`My location (${v.lat.toFixed(5)}, ${v.lng.toFixed(5)})`}
+function routeDist(p,r){let m=Infinity;r.steps.forEach(s=>{for(let i=1;i<s.path.length;i++)m=Math.min(m,segDist(p,s.path[i-1],s.path[i]))});return m}
+// source: false = GPS, otherwise a label for a manual position ('Picked on map', 'Entered: …')
+function onPosition(lat,lng,acc,simulated){
+  if(simulated&&watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
+  const first=!state.useHere, pos={lat,lng};
+  state.here={lat,lng,acc};
+  if(!hereMarker){
+    hereCircle=new google.maps.Circle({map,fillColor:'#1a73e8',fillOpacity:.12,strokeOpacity:0,clickable:false,zIndex:8});
+    hereMarker=new google.maps.Marker({map,zIndex:9,title:'You',icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:'#1a73e8',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}});
+  }
+  hereMarker.setPosition(pos); hereCircle.setCenter(pos); hereCircle.setRadius(Math.min(acc||20,300));
+  $('locChip').hidden=false; $('locChip').textContent=simulated?'Manual location':`Live location ±${Math.round(acc)} m`;
+  $('locBtn').textContent='Located';
+  if(first){
+    state.useHere=true; $('from').value='My location'; map.panTo(pos);
+    say('Parade Pilot',simulated?`Location set (${esc(simulated===true?'picked on map':simulated)}). I'll plan from here. Update it any time to show your progress.`:"Got your location. I'll plan from where you are and follow your progress while I watch the trip.",'asst');
+    return;
+  }
+  if(simulated&&!state.watching) say('Parade Pilot',`Location updated (${esc(simulated===true?'picked on map':simulated)}).`,'asst');
+  if(!state.watching||!state.last) return;
+  // safety: tell the traveler once when they get close to a restriction
+  const zone=D.parade.on&&paradeDist(pos)<60?`the parade route near ${nearestLandmark(pos)}`:(()=>{const k=['staging','penn7','crowd34'].find(k=>D[k].on&&dist(pos,D[k].c)<D[k].r);return k?D[k].label:null})();
+  if(zone&&!alerted.has(zone)){alerted.add(zone);say('Parade Pilot',`<b>Heads up:</b> you're next to ${esc(zone)}. Follow official directions on site. Don't cross barricades.`,'msg push')}
+  // progress: replan when the traveler leaves the planned route
+  const off=routeDist(pos,state.last);
+  if(off>200&&Date.now()-lastReplan>20000){
+    lastReplan=Date.now();
+    say('Parade Pilot',`You're about ${Math.round(off)} m from the planned route. Rechecking from where you are now.`,'msg push');
+    plan('You moved off the planned route');
+  }
+}
+function startLocation(){
+  if(!navigator.geolocation){say('Parade Pilot','This browser cannot share location. I\'ll plan from the address you typed.','asst');return}
+  $('locBtn').textContent='Locating…';
+  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+  watchId=navigator.geolocation.watchPosition(p=>onPosition(p.coords.latitude,p.coords.longitude,p.coords.accuracy,false),
+    e=>{$('locBtn').textContent='Use my location';
+      say('Parade Pilot',`Current position unavailable (${esc(e.message||'permission denied')}). I'll plan from the address you typed, and alerts will be based on your planned route.`,'asst')},
+    {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+}
+$('locBtn').onclick=startLocation;
+$('liveBtn').onclick=startLocation;
+$('pickBtn').onclick=()=>{state.pickOnce=true;$('pickBtn').textContent='Click the map…';map.setOptions({draggableCursor:'crosshair'})};
+// Typed location: Geocoding API first, then fall back to the Routes API (the start point of a route from that address)
+async function locate(text){
+  const addr=/new york|ny|brooklyn|queens|bronx/i.test(text)?text:text+', New York, NY';
+  try{const r=await new google.maps.Geocoder().geocode({address:addr});const l=r.results[0].geometry.location;return {lat:l.lat(),lng:l.lng(),name:r.results[0].formatted_address}}catch(e){console.warn('Geocoder failed, trying Routes',e)}
+  const rs=await getRoutes(addr,'Times Square, New York, NY','WALK',new Date(Date.now()+60000));
+  const p=rs[0]?.steps[0]?.path[0]; if(!p) throw new Error('not found'); return {...p,name:addr};
+}
+$('hereForm').onsubmit=async e=>{e.preventDefault();const q=$('hereInput').value.trim();if(!q)return;
+  try{const p=await locate(q);onPosition(p.lat,p.lng,25,'entered: '+p.name);map.panTo(p)}
+  catch(err){say('Parade Pilot',`I couldn't find "${esc(q)}". Try a street corner or a landmark, or pick the spot on the map.`,'asst')}};
+$('from').addEventListener('input',()=>{if($('from').value!=='My location'){state.useHere=false;$('locBtn').textContent='Use my location'}});
+
+// ---------- wiring ----------
+$('plan').onclick=()=>{say('You',`${esc($('from').value)} → ${esc($('to').value)}, leaving ${$('leave').value}${$('by').value?', arrive by '+$('by').value:''}`,'user');plan()};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const p=PRESETS[b.dataset.p];state.useHere=false;$('locBtn').textContent='Use my location';['from','to','leave','by'].forEach(k=>$(k).value=p[k]);say('You',esc(p.say),'user');plan()});
+$('askForm').onsubmit=e=>{e.preventDefault();const q=$('ask').value.trim();if(!q)return;say('You',esc(q),'user');$('ask').value='';
+  const m=q.match(/from (.+?) to (.+?)(?:\s+(?:by|before|at)\s+(.+))?$/i);
+  if(m){$('from').value=m[1]+', New York, NY';$('to').value=m[2]+', New York, NY';
+    const tm=m[3]&&m[3].match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if(tm){let h=+tm[1];if(/pm/i.test(tm[3]||'')&&h<12)h+=12;$('by').value=String(h).padStart(2,'0')+':'+(tm[2]||'00')}
+    plan();
+  } else say('Parade Pilot','Tell me where from and to, like "from Times Square to Park Slope by 1pm".','asst');
+};
+document.querySelectorAll('#sim input').forEach(cb=>cb.onchange=()=>{
+  const k=cb.dataset.d; D[k].on=cb.checked; if(k==='parade') $('paradeMode').classList.toggle('on',cb.checked);
+  const label={parade:'Parade route closure',staging:'Balloon staging zone',penn7:'34 St–Penn (7th Ave) restriction',crowd34:'34th St crowding',ac:'A/C/E delay',l123:'1/2/3 suspension'}[k];
+  if(state.watching){ say('City feed',`${label} ${cb.checked?'is now active':'has cleared'}.`,'msg push'); plan(`${label} ${cb.checked?'reported':'cleared'}`); }
+  else draw(null,[]);
+});
+$('paradeMode').onclick=()=>{const cb=document.querySelector('[data-d="parade"]');cb.checked=!cb.checked;cb.onchange()};
+
+function initMap(){
+  map=new google.maps.Map($('map'),{center:{lat:40.765,lng:-73.982},zoom:14,mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false});
+  draw(null,[]);
+  map.addListener('click',e=>{if(!state.pickOnce&&!$('clickLoc').checked)return;
+    state.pickOnce=false;$('pickBtn').textContent='Pick on map';map.setOptions({draggableCursor:null});
+    onPosition(e.latLng.lat(),e.latLng.lng(),15,'picked on map')});
+  say('Parade Pilot','Parade mode is on. I know the 100th parade route, the balloon staging area and live station closures. Pick a trip above or ask me below, and I\'ll keep watching it after you leave.','asst');
+}
+window.gm_authFailure=()=>{$('gate').style.display='flex';$('gateMsg').innerHTML='<b>Google rejected the API key.</b><br>Enable the Maps JavaScript API and Routes API for it, and allow http://localhost:8765/* if the key has website restrictions.'};
+if(!window.PP_KEY){$('gate').style.display='flex';$('gateMsg').textContent='Add your key to config.js to load the map.'}
+else{const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.PP_KEY)}&callback=initMap&v=weekly`;s.async=true;document.head.appendChild(s)}
+</script>
+</body>
+</html>

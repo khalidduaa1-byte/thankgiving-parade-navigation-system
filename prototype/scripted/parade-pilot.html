@@ -1,0 +1,270 @@
+<title>Parade Pilot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: transit-ops console. Assistant conversation left, live route map right, framework below. */
+:root{
+  --bg:#f3f4f7; --panel:#ffffff; --fg:#161a24; --muted:#5b6274; --line:#dde0e8;
+  --accent:#1f4fd1; --accent-soft:#e3eafc; --parade:#d33a2c; --parade-soft:#fbe6e3;
+  --ok:#1d7a4c; --ok-soft:#dff3e8; --warn:#9a6200; --warn-soft:#fbf0d9;
+  --park:#d7ecd9; --street:#e6e8ee; --code:#f0f2f7;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f121a; --panel:#171b26; --fg:#e8eaf0; --muted:#9aa1b3; --line:#2a3040;
+  --accent:#7d9cff; --accent-soft:#1f2a4a; --parade:#ff6b5c; --parade-soft:#3a1f1d;
+  --ok:#5fd39a; --ok-soft:#173326; --warn:#f0b54d; --warn-soft:#382a12;
+  --park:#1d3324; --street:#232938; --code:#11151e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f121a; --panel:#171b26; --fg:#e8eaf0; --muted:#9aa1b3; --line:#2a3040;
+  --accent:#7d9cff; --accent-soft:#1f2a4a; --parade:#ff6b5c; --parade-soft:#3a1f1d;
+  --ok:#5fd39a; --ok-soft:#173326; --warn:#f0b54d; --warn-soft:#382a12;
+  --park:#1d3324; --street:#232938; --code:#11151e; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+h1{font-family:var(--display);font-size:2rem;margin:0;letter-spacing:-.01em}
+h1 span{color:var(--parade)}
+h2{font-family:var(--display);font-size:1.15rem;margin:0}
+.sub{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.note{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+.steps{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{font:500 13px var(--body);border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:6px 12px;cursor:pointer}
+.pill[aria-current="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.pill:disabled{opacity:.45;cursor:not-allowed}
+.pill:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.clock{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto;padding-right:4px}
+.msg{border-radius:10px;padding:10px 12px;max-width:92%;min-width:0}
+.user{align-self:flex-end;background:var(--accent);color:var(--panel)}
+.asst{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
+.event{align-self:stretch;background:var(--parade-soft);border:1px solid var(--parade);font-size:14px}
+.who{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.75;margin-bottom:2px;font-weight:600}
+.tool{align-self:stretch;font-family:var(--mono);font-size:12.5px;background:var(--code);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.tool b{color:var(--accent);font-weight:500}
+.tool .res{color:var(--muted)}
+.approve{align-self:stretch;border:1.5px solid var(--warn);background:var(--warn-soft);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.approve .row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 14px var(--body);border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+.btn.primary{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+.btn[aria-pressed="true"]{outline:2px solid var(--fg)}
+svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.log{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.log li{display:flex;gap:8px;align-items:baseline;font-size:13.5px}
+.tag{font:600 10.5px var(--mono);letter-spacing:.05em;padding:2px 6px;border-radius:4px;flex:none}
+.t-auto{background:var(--accent-soft);color:var(--accent)}
+.t-block{background:var(--parade-soft);color:var(--parade)}
+.t-ask{background:var(--warn-soft);color:var(--warn)}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.fw{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media (max-width:980px){.fw{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.fw{grid-template-columns:1fr}}
+.fw .panel h3{font-family:var(--display);font-size:1rem;margin:0}
+.fw .q{font-size:13px;color:var(--muted);margin:0}
+.fw ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td code{font-family:var(--mono);font-size:12.5px}
+.pitch{font-family:var(--display);font-size:1.15rem;line-height:1.45;margin:0;text-wrap:balance}
+@media (prefers-reduced-motion:no-preference){.msg,.tool,.approve{animation:in .25s ease-out}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Parade <span>Pilot</span></h1>
+      <p class="sub">A parade-aware navigation service that AI assistants call through MCP. It plans around closures, watches your trip, reroutes on its own, and asks before anything that costs money.</p>
+    </div>
+    <div class="note">Clickable prototype · simulated data · 100th Thanksgiving Day Parade, NYC</div>
+  </header>
+
+  <nav class="steps" aria-label="Scenario steps" id="steps"></nav>
+
+  <div class="grid">
+    <section class="panel" aria-label="Assistant conversation">
+      <div class="panel-head"><h2>Traveler's assistant</h2><span class="clock" id="clock"></span></div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="steps"><button class="pill" id="prev">Back</button><button class="pill" id="next">Next step</button></div>
+    </section>
+
+    <section class="panel" aria-label="Route map">
+      <div class="panel-head"><h2>Live route</h2><span class="clock" id="eta"></span></div>
+      <svg viewBox="0 0 400 620" role="img" aria-label="Schematic map of Manhattan's West Side showing the parade route and the traveler's route" id="map"></svg>
+      <div class="legend">
+        <span><i style="background:var(--parade)"></i>Parade route</span>
+        <span><i style="background:var(--accent)"></i>Planned route</span>
+        <span><i style="background:var(--ok)"></i>Ride (if approved)</span>
+        <span><i style="background:var(--muted)"></i>Walk</span>
+      </div>
+      <h2>What the agent did</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+  </div>
+
+  <section class="panel">
+    <p class="pitch">Every assistant will get asked how to get around the parade. Parade Pilot is the tool they call, because it has live closure, crowd and balloon data no general map has. It reroutes on its own, and always asks before spending money or messaging anyone.</p>
+  </section>
+
+  <h2>The four principles</h2>
+  <div class="fw">
+    <div class="panel"><h3>Customer journey</h3><p class="q">When does a traveler first need help, and what if the route changes after they leave?</p>
+      <ul><li>Night before: the traveler asks their assistant, and Parade Pilot builds a plan around closures.</li><li>On the move: <code>watch_trip</code> pushes reroutes, so the traveler doesn't recheck.</li><li>After noon: staggers people leaving so crowds clear evenly.</li></ul></div>
+    <div class="panel"><h3>Distribution</h3><p class="q">Why would an AI assistant call this service?</p>
+      <ul><li>Tool descriptions advertise what general maps lack: live parade closures, balloon positions, open station entrances.</li><li>Every answer carries a data timestamp and confidence level.</li><li>Partners like rideshare and transit apps call the same MCP.</li></ul></div>
+    <div class="panel"><h3>Value</h3><p class="q">What does it add beyond the traveler's map app, and how does that create value?</p>
+      <ul><li>Advantage is the inputs: exclusive live feeds from the city, police and parade organizers.</li><li>Knows the traveler's plan (train time) and watches it.</li><li>Revenue: ride referral fees, city or event sponsorship, reuse for the Marathon and New Year's Eve.</li></ul></div>
+    <div class="panel"><h3>Control</h3><p class="q">What can the agent change alone, and what needs approval?</p>
+      <ul><li>Alone: reroute transit and walking, change leave-by alerts.</li><li>Approval: booking rides, payments, messaging people.</li><li>A narrow MCP instead of the full API, official police instructions always win, stale data is flagged.</li></ul></div>
+  </div>
+
+  <section class="panel">
+    <h2>MCP tools exposed to assistants</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Tool</th><th>What it does</th><th>Control</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan_parade_trip</code></td><td>Route from origin to destination by a time, avoiding closures and crowds</td><td><span class="tag t-auto">AUTO</span></td></tr>
+        <tr><td><code>check_disruptions</code></td><td>Live closures, station access and parade position for an area and time</td><td><span class="tag t-auto">AUTO</span></td></tr>
+        <tr><td><code>watch_trip</code></td><td>Monitors a planned trip and pushes reroutes</td><td><span class="tag t-auto">AUTO</span></td></tr>
+        <tr><td><code>find_nearby</code></td><td>Cafés, restrooms and open station entrances along the route</td><td><span class="tag t-auto">AUTO</span></td></tr>
+        <tr><td><code>book_ride</code></td><td>Books a car on a parade-safe route, with a price cap</td><td><span class="tag t-ask">NEEDS APPROVAL</span></td></tr>
+        <tr><td><code>notify_contact</code></td><td>Sends a "running late" message to someone the traveler names</td><td><span class="tag t-ask">NEEDS APPROVAL</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="q" style="margin:0;color:var(--muted);font-size:13px">Built on Google Maps Platform (Maps JavaScript API for display, Routes API for transit and driving routes, Places API for nearby stops) plus city closure and transit feeds. Not affiliated with any of the organizations named.</p>
+  </section>
+</div>
+
+<script>
+const S = id => document.getElementById(id);
+let step = 0, choice = null;
+
+const tool = (name, args, res) => ({k:'tool', name, args, res});
+const steps = [
+  { label:'Wed 9:12 PM · Plan', clock:'Wed 9:12 PM', eta:'Leave 9:45 · arrive 10:15', route:'A',
+    chat:[
+      {k:'user', t:"I have an 11:05 Amtrak from Penn tomorrow. I'm at W 79th & Amsterdam and I hate crowds. Get me there with time to spare."},
+      tool('plan_parade_trip', '{origin: "W 79 St & Amsterdam Ave", destination: "Moynihan Train Hall", arrive_by: "10:35", prefs: ["avoid_crowds", "transit"]}',
+        '1 train 79 St → 34 St–Penn, enter station underground. Leave 9:45, arrive 10:15.\nChecked closures: CPW 77–59 St, Central Park S, 6th Ave, W 34 St.\nExcluded: 81 St–Museum station (balloon staging zone).\nData updated 9:10 PM · confidence high'),
+      tool('watch_trip', '{trip_id: "t_1105"}', 'Watching. Will push changes.'),
+      {k:'asst', t:"Leave by 9:45 tomorrow. Take the 1 from 79th St to 34th St–Penn and walk into the station underground, so you never reach street level near the parade. I'll watch the trip and only ping you if something changes."}
+    ],
+    log:[['t-auto','AUTO','Built a parade-safe plan and started watching the trip'],['t-block','EXCLUDED','Skipped 81 St–Museum station: balloon staging zone']]
+  },
+  { label:'Thu 9:31 AM · Disruption', clock:'Thu 9:31 AM', eta:'Leave 9:45 · arrive 10:20', route:'B', closed:true,
+    chat:[
+      {k:'event', t:"Parade Pilot alert: police are restricting access to 34 St–Penn Station (7th Ave) near the parade finish, 9:30 AM–12:30 PM."},
+      tool('check_disruptions', '{area: "34 St & 7 Ave", time: "10:00–10:30"}', '7th Ave station access restricted · 8th Ave (A/C/E) open · Moynihan entrance open\nData updated 9:30 AM · source: city feed'),
+      {k:'asst', t:"I've already updated your route. Stay on the 1 to 59 St–Columbus Circle, transfer underground to the A or C downtown, get off at 34 St–Penn (8th Ave) and walk into Moynihan Train Hall. Don't exit at Columbus Circle, it's on the parade route. Same leave time, arrive 10:20."}
+    ],
+    log:[['t-auto','AUTO','Rerouted to the A/C via Columbus Circle (no cost, within your rules)'],['t-block','EXCLUDED','No street exit at Columbus Circle: on the parade route']]
+  },
+  { label:'Thu 9:58 AM · Needs approval', clock:'Thu 9:58 AM', eta:'Subway: arrive 10:38 · Ride: 10:24', route:'B', closed:true, delay:true, approval:true,
+    chat:[
+      {k:'event', t:"Parade Pilot alert: A/C downtown running about 15 minutes late."},
+      {k:'asst', t:"The A/C is about 15 minutes late. On the subway you'd arrive 10:38, which still makes the 11:05 but with 27 minutes to spare instead of 45. A ride down the West Side Highway avoids the parade completely and arrives 10:24 for about $28. Want me to book it?"},
+      tool('book_ride', '{pickup: "W 79 St & Amsterdam Ave", dropoff: "Moynihan Train Hall, 8th Ave", route: "West Side Hwy", max_price: 30}', 'requires_confirmation: true · held until the traveler approves')
+    ],
+    log:[['t-ask','ASKED','Ride booking held for your approval: it costs money']]
+  },
+  { label:'Thu 10:24 AM · Arrived', clock:'Thu 10:24 AM', route:'final', closed:true, chat:[], log:[] }
+];
+
+function finalStep(){
+  if(choice==='ride') return {
+    eta:'Arrived 10:24 · 41 min before departure',
+    chat:[tool('book_ride','{..., confirmed_by_user: true}','Booked · $27.40 · driver arriving 10:01'),
+      {k:'asst', t:"You're at Moynihan Train Hall with 41 minutes before your 11:05. Your track is usually posted about 15 minutes before departure. I've stopped watching the trip."}],
+    log:[['t-ok','APPROVED','You approved the ride: $27.40, West Side Hwy, no parade crossings'],['t-auto','AUTO','Trip complete, watching stopped']]};
+  return {
+    eta:'Arrived 10:38 · 27 min before departure',
+    chat:[{k:'asst', t:"You're at Moynihan Train Hall with 27 minutes before your 11:05. No ride booked, nothing charged. I've stopped watching the trip."}],
+    log:[['t-ok','DECLINED','You kept the subway, so no ride was booked'],['t-auto','AUTO','Trip complete, watching stopped']]};
+}
+
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function renderMsg(m){
+  if(m.k==='tool') return `<div class="tool"><b>→ ${m.name}</b>(${esc(m.args)})\n<span class="res">← ${esc(m.res)}</span></div>`;
+  const who={user:'Traveler',asst:'Assistant',event:'Push from Parade Pilot'}[m.k];
+  return `<div class="msg ${m.k}"><div class="who">${who}</div>${esc(m.t)}</div>`;
+}
+
+function render(){
+  S('steps').innerHTML = steps.map((s,i)=>`<button class="pill" data-i="${i}" aria-current="${i===step}" ${i===3&&!choice?'disabled':''}>${s.label}</button>`).join('');
+  S('steps').querySelectorAll('button').forEach(b=>b.onclick=()=>{step=+b.dataset.i;render()});
+  let html='', log=[];
+  for(let i=0;i<=step;i++){
+    const s = i===3 ? {...steps[3], ...finalStep()} : steps[i];
+    html += s.chat.map(renderMsg).join('');
+    log = log.concat(s.log);
+    if(s.approval){
+      html += `<div class="approve"><div><strong>Approval needed:</strong> book a ride for about $28 (cap $30)?</div>
+        <div class="row"><button class="btn primary" id="yes" aria-pressed="${choice==='ride'}">Book the ride</button><button class="btn" id="no" aria-pressed="${choice==='subway'}">Stay on the subway</button></div></div>`;
+    }
+  }
+  const cur = step===3 ? {...steps[3], ...finalStep()} : steps[step];
+  S('chat').innerHTML = html;
+  S('chat').scrollTop = S('chat').scrollHeight;
+  S('clock').textContent = cur.clock;
+  S('eta').textContent = cur.eta;
+  S('log').innerHTML = log.map(([c,t,x])=>`<li><span class="tag ${c}">${t}</span><span>${x}</span></li>`).join('');
+  const y=S('yes'), n=S('no');
+  if(y){y.onclick=()=>{choice='ride';step=3;render()}; n.onclick=()=>{choice='subway';step=3;render()};}
+  S('prev').disabled = step===0;
+  S('next').disabled = step===3 || (step===2 && !choice);
+  S('next').textContent = step===2 && !choice ? 'Choose above to continue' : 'Next step';
+  drawMap(cur);
+}
+S('prev').onclick=()=>{if(step>0){step--;render()}};
+S('next').onclick=()=>{if(step<3){step++;render()}};
+
+// Schematic: avenues as vertical lines, street y = 40 + (86 - street) * 10
+const Y = st => 40 + (86-st)*10;
+const AVE = {wsh:40, amst:110, bway:140, col:150, cpw:180, sev:220, six:260, fifth:300};
+function drawMap(s){
+  const st=[86,79,72,59,42,34], av=[['West Side Hwy',AVE.wsh],['Amsterdam',AVE.amst],['8th / CPW',AVE.cpw],['7th',AVE.sev],['6th',AVE.six],['5th',AVE.fifth]];
+  let g = `<rect x="0" y="0" width="400" height="620" fill="var(--panel)"/>`;
+  g += `<rect x="0" y="0" width="22" height="620" fill="var(--accent-soft)"/><text x="11" y="330" fill="var(--accent)" font-size="10" transform="rotate(-90 11 330)" text-anchor="middle" font-family="var(--body)">Hudson River</text>`;
+  av.forEach(([n,x])=>{g+=`<line x1="${x}" y1="20" x2="${x}" y2="605" stroke="var(--street)" stroke-width="3"/><text x="${x}" y="616" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--body)">${n}</text>`});
+  st.forEach(n=>{g+=`<line x1="22" y1="${Y(n)}" x2="380" y2="${Y(n)}" stroke="var(--street)" stroke-width="2"/><text x="384" y="${Y(n)+3}" font-size="9" fill="var(--muted)" font-family="var(--body)">${n}th</text>`});
+  g += `<rect x="${AVE.cpw}" y="${Y(86)}" width="${AVE.fifth-AVE.cpw}" height="${Y(59)-Y(86)}" fill="var(--park)" rx="3"/><text x="240" y="200" font-size="11" fill="var(--muted)" text-anchor="middle" font-family="var(--body)">Central Park</text>`;
+  // balloon staging zone
+  g += `<rect x="${AVE.col}" y="${Y(81)}" width="30" height="${Y(77)-Y(81)}" fill="var(--parade-soft)" stroke="var(--parade)" stroke-dasharray="3 2"/><text x="${AVE.col-4}" y="${Y(81)-4}" font-size="9" fill="var(--parade)" text-anchor="end" font-family="var(--body)">Balloon staging</text>`;
+  // parade route
+  const pr = `M${AVE.cpw} ${Y(77)} L${AVE.cpw} ${Y(59)} L${AVE.six} ${Y(59)} L${AVE.six} ${Y(34)} L${AVE.sev} ${Y(34)}`;
+  g += `<path d="${pr}" fill="none" stroke="var(--parade)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>`;
+  g += `<text x="${AVE.six+8}" y="${Y(48)}" font-size="10" fill="var(--parade)" font-family="var(--body)" font-weight="600">Parade 9 AM–noon</text>`;
+  // Penn + Moynihan
+  g += `<rect x="${AVE.cpw+4}" y="${Y(33)}" width="${AVE.sev-AVE.cpw-8}" height="20" fill="var(--street)" stroke="var(--muted)"/><text x="${(AVE.cpw+AVE.sev)/2}" y="${Y(33)+32}" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="var(--body)">Penn Sta.</text>`;
+  g += `<rect x="${AVE.col-38}" y="${Y(33)}" width="${AVE.cpw-AVE.col+30}" height="20" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="${AVE.col-10}" y="${Y(33)+32}" font-size="9" fill="var(--accent)" text-anchor="middle" font-family="var(--body)" font-weight="600">Moynihan</text>`;
+  const O=[AVE.amst,Y(79)], dest=[AVE.cpw-14,Y(33)+10];
+  const walk = `M${O[0]} ${O[1]} L${AVE.bway} ${O[1]}`;
+  const lineA = `M${AVE.bway} ${Y(79)} L${AVE.bway} ${Y(68)} L${AVE.cpw} ${Y(59)} L${AVE.sev} ${Y(42)} L${AVE.sev} ${Y(34)}`;
+  const lineB = `M${AVE.bway} ${Y(79)} L${AVE.bway} ${Y(68)} L${AVE.cpw} ${Y(59)} L${AVE.cpw} ${Y(34)} L${dest[0]} ${dest[1]}`;
+  const ride = `M${O[0]} ${O[1]} L${AVE.wsh} ${Y(77)} L${AVE.wsh} ${Y(33)+10} L${dest[0]} ${dest[1]}`;
+  const route = s.route==='final' ? (choice==='ride'?'ride':'B') : s.route;
+  if(route==='ride') g += `<path d="${ride}" fill="none" stroke="var(--ok)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+  else {
+    g += `<path d="${walk}" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-dasharray="3 3"/>`;
+    g += `<path d="${route==='A'?lineA:lineB}" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if(route==='B') g += `<circle cx="${AVE.cpw}" cy="${Y(59)}" r="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2.5"/><text x="${AVE.cpw-10}" y="${Y(59)+18}" font-size="9" fill="var(--accent)" text-anchor="end" font-family="var(--body)">Transfer underground</text>`;
+  }
+  if(s.closed){ const x=AVE.sev, y=Y(34); g += `<g stroke="var(--parade)" stroke-width="3"><line x1="${x-7}" y1="${y-7}" x2="${x+7}" y2="${y+7}"/><line x1="${x+7}" y1="${y-7}" x2="${x-7}" y2="${y+7}"/></g><text x="${x+10}" y="${y-8}" font-size="9" fill="var(--parade)" font-family="var(--body)">7th Ave access restricted</text>`;}
+  if(s.delay && !choice){ g += `<rect x="${AVE.cpw+6}" y="${Y(50)-9}" width="70" height="16" rx="3" fill="var(--warn-soft)" stroke="var(--warn)"/><text x="${AVE.cpw+41}" y="${Y(50)+2}" font-size="9" fill="var(--warn)" text-anchor="middle" font-family="var(--body)">A/C +15 min</text>`;}
+  g += `<circle cx="${O[0]}" cy="${O[1]}" r="6" fill="var(--fg)"/><text x="${O[0]-8}" y="${O[1]-10}" font-size="10" fill="var(--fg)" font-family="var(--body)" font-weight="600" text-anchor="middle">Start</text>`;
+  g += `<circle cx="${dest[0]}" cy="${dest[1]}" r="5" fill="var(--accent)"/>`;
+  S('map').innerHTML = g;
+  // move var() presentation attributes into style so theme tokens resolve everywhere
+  S('map').querySelectorAll('*').forEach(el=>{
+    ['fill','stroke','font-family'].forEach(a=>{const v=el.getAttribute(a); if(v&&v.includes('var(')){el.style.setProperty(a,v);el.removeAttribute(a)}});
+  });
+}
+render();
+</script>
