@@ -1,5 +1,13 @@
 # Navigating New York City during the 100th annual Macy’s Thanksgiving Day Parade
 
+## Product documents
+
+- [Product requirements: disruption assistance inside Google Maps](PRD.md)
+- [Event-day integrations and MCP plan](docs/INTEGRATIONS.md)
+
+The current product direction is a native Google Maps feature with no separate app download. These documents describe requirements and integration dependencies; the feature is not yet implemented.
+
+
 ## Workshop prompt
 
 Build a city navigation agent that helps New Yorkers get where they need to go during the parade. The agent should monitor disruptions, understand each traveler’s plans and preferences, and adapt their journey in real time with minimal effort from the traveler.
