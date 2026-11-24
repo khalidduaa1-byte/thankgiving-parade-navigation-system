@@ -6,7 +6,9 @@ The intended product is assistance inside Google Maps: identify a disruption tha
 
 ## Try the demo
 
-The hosted test link is being published and will be added here once deployment succeeds.
+**[Open the live workshop demo](https://parade-pilot-duaa.bm763.chatgpt.site)**
+
+No local server is needed for the hosted version. Google API enablement, billing, and website restrictions still apply. The hosted domain must be allowed on the browser key.
 
 - [Live-map prototype and local setup](prototype/README.md)
 - [Address suggestions setup and troubleshooting](prototype/maps-live/AUTOCOMPLETE.md)
