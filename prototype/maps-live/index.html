@@ -320,9 +320,10 @@ function onPosition(lat,lng,acc,simulated){
   if(first){
     state.useHere=true; $('from').value='My location'; map.panTo(pos);
     say('Parade Pilot',simulated?`Location set (${esc(simulated===true?'picked on map':simulated)}). I'll plan from here. Update it any time to show your progress.`:"Got your location. I'll plan from where you are and follow your progress while I watch the trip.",'asst');
+    if($('to').value.trim()) plan();
     return;
   }
-  if(simulated&&!state.watching) say('Parade Pilot',`Location updated (${esc(simulated===true?'picked on map':simulated)}).`,'asst');
+  if(simulated&&!state.watching){ say('Parade Pilot',`Location updated (${esc(simulated===true?'picked on map':simulated)}).`,'asst'); if($('to').value.trim()) plan(); return; }
   if(!state.watching||!state.last) return;
   // safety: tell the traveler once when they get close to a restriction
   const zone=D.parade.on&&paradeDist(pos)<60?`the parade route near ${nearestLandmark(pos)}`:(()=>{const k=['staging','penn7','crowd34'].find(k=>D[k].on&&dist(pos,D[k].c)<D[k].r);return k?D[k].label:null})();
@@ -341,7 +342,7 @@ function startLocation(){
   if(watchId!==null) navigator.geolocation.clearWatch(watchId);
   watchId=navigator.geolocation.watchPosition(p=>onPosition(p.coords.latitude,p.coords.longitude,p.coords.accuracy,false),
     e=>{$('locBtn').textContent='Use my location';
-      say('Parade Pilot',`Current position unavailable (${esc(e.message||'permission denied')}). I'll plan from the address you typed, and alerts will be based on your planned route.`,'asst')},
+      say('Parade Pilot',`Current position unavailable (${esc(e.message||'permission denied')}). To use GPS, allow location for this page (the icon at the left of the address bar) and for your browser in macOS System Settings → Privacy &amp; Security → Location Services, then reload. Or type where you are or use <b>Pick on map</b> in the My location box. Until then, alerts are based on your planned route.`,'asst')},
     {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
 }
 $('locBtn').onclick=startLocation;
@@ -370,7 +371,7 @@ $('askForm').onsubmit=e=>{e.preventDefault();const q=$('ask').value.trim();if(!q
     plan();
   } else say('Parade Pilot','Tell me where from and to, like "from Times Square to Park Slope by 1pm".','asst');
 };
-document.querySelectorAll('#sim input').forEach(cb=>cb.onchange=()=>{
+document.querySelectorAll('#sim input[data-d]').forEach(cb=>cb.onchange=()=>{
   const k=cb.dataset.d; D[k].on=cb.checked; if(k==='parade') $('paradeMode').classList.toggle('on',cb.checked);
   const label={parade:'Parade route closure',staging:'Balloon staging zone',penn7:'34 St–Penn (7th Ave) restriction',crowd34:'34th St crowding',ac:'A/C/E delay',l123:'1/2/3 suspension'}[k];
   if(state.watching){ say('City feed',`${label} ${cb.checked?'is now active':'has cleared'}.`,'msg push'); plan(`${label} ${cb.checked?'reported':'cleared'}`); }
