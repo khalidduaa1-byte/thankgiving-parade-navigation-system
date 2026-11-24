@@ -10,6 +10,12 @@
 --parade:#d93025;--parade-soft:#fce8e6;--ok:#188038;--ok-soft:#e6f4ea;--warn:#b06000;--warn-soft:#fef7e0;
 --mono:"IBM Plex Mono",ui-monospace,monospace;--body:"Inter",system-ui,sans-serif}
 *{box-sizing:border-box}
+.ac{position:fixed;z-index:20;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.22);overflow:hidden;font-size:13.5px;max-height:320px;overflow-y:auto}
+.ac div{padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;gap:1px;border-bottom:1px solid #f1f3f4}
+.ac div:last-child{border-bottom:0}
+.ac div[aria-selected="true"],.ac div:hover{background:#e8f0fe}
+.ac b{font-weight:600}.ac small{color:#5f6368;font-size:12px}
+.ac .gps b{color:#1a73e8}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(--fg);background:var(--soft)}
 #map{position:absolute;inset:0}
@@ -359,6 +365,57 @@ $('hereForm').onsubmit=async e=>{e.preventDefault();const q=$('hereInput').value
   try{const p=await locate(q);onPosition(p.lat,p.lng,25,'entered: '+p.name);map.panTo(p)}
   catch(err){say('Parade Pilot',`I couldn't find "${esc(q)}". Try a street corner or a landmark, or pick the spot on the map.`,'asst')}};
 $('from').addEventListener('input',()=>{if($('from').value!=='My location'){state.useHere=false;$('locBtn').textContent='Use my location'}});
+
+// ---------- place suggestions (Places API autocomplete) ----------
+async function suggest(q,token){
+  const r=await fetch('https://places.googleapis.com/v1/places:autocomplete',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':window.PP_KEY},
+    body:JSON.stringify({input:q,sessionToken:token,locationBias:{circle:{center:{latitude:40.758,longitude:-73.985},radius:25000}}})});
+  const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
+  return (j.suggestions||[]).filter(s=>s.placePrediction).map(s=>{const p=s.placePrediction;
+    return {id:p.placeId,main:p.structuredFormat?.mainText?.text||p.text.text,sub:p.structuredFormat?.secondaryText?.text||'',full:p.text.text}});
+}
+async function placeDetails(id,token){
+  const r=await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(id)}?sessionToken=${token}`,{headers:{'X-Goog-Api-Key':window.PP_KEY,'X-Goog-FieldMask':'location,formattedAddress,displayName'}});
+  const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
+  return {lat:j.location.latitude,lng:j.location.longitude,name:j.displayName?.text||j.formattedAddress};
+}
+// Attach a suggestion dropdown to an input. onPick gets {full, main, id, gps?}.
+function autocomplete(input,onPick,{gpsOption=false}={}){
+  const box=document.createElement('div');box.className='ac';box.hidden=true;box.setAttribute('role','listbox');document.body.appendChild(box);
+  let items=[],sel=-1,timer=null,token=crypto.randomUUID(),seq=0;
+  const place=()=>{const r=input.getBoundingClientRect(),below=innerHeight-r.bottom;box.style.left=r.left+'px';box.style.width=Math.max(r.width,260)+'px';
+    if(below<240){box.style.top='';box.style.bottom=(innerHeight-r.top+4)+'px'}else{box.style.bottom='';box.style.top=(r.bottom+4)+'px'}};
+  const render=()=>{box.innerHTML=items.map((it,i)=>`<div role="option" class="${it.gps?'gps':''}" aria-selected="${i===sel}" data-i="${i}"><b>${esc(it.main)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div>`).join('');
+    box.hidden=!items.length; if(items.length) place();
+    box.querySelectorAll('[data-i]').forEach(d=>d.onmousedown=e=>{e.preventDefault();choose(+d.dataset.i)})};
+  const close=()=>{box.hidden=true;items=[];sel=-1};
+  const choose=i=>{const it=items[i];if(!it)return;close();if(!it.gps)input.value=it.full;onPick({...it,token});token=crypto.randomUUID()};
+  input.setAttribute('autocomplete','off');
+  input.addEventListener('input',()=>{clearTimeout(timer);const q=input.value.trim();
+    if(q.length<2){items=gpsOption?[{gps:true,main:'Use my current location',sub:'GPS'}]:[];sel=-1;render();return}
+    timer=setTimeout(async()=>{const my=++seq;
+      try{const res=await suggest(q,token); if(my!==seq)return;
+        items=(gpsOption?[{gps:true,main:'Use my current location',sub:'GPS'}]:[]).concat(res);sel=items.length>1&&gpsOption?1:0;render()}
+      catch(e){console.warn('Suggestions unavailable',e)}},180)});
+  input.addEventListener('focus',()=>{if(gpsOption&&!input.value.trim()){items=[{gps:true,main:'Use my current location',sub:'GPS'}];sel=0;render()}});
+  input.addEventListener('keydown',e=>{if(box.hidden)return;
+    if(e.key==='ArrowDown'){e.preventDefault();sel=(sel+1)%items.length;render()}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=(sel-1+items.length)%items.length;render()}
+    else if(e.key==='Enter'){e.preventDefault();choose(Math.max(sel,0))}
+    else if(e.key==='Escape'){close()}});
+  input.addEventListener('blur',()=>setTimeout(close,120));
+  addEventListener('resize',()=>{if(!box.hidden)place()});
+}
+
+// "My location": pick a suggestion → that becomes the traveler's position and the trip is planned from it
+autocomplete($('hereInput'),async it=>{
+  if(it.gps) return startLocation();
+  try{const p=await placeDetails(it.id,it.token);$('hereInput').value=p.name;onPosition(p.lat,p.lng,20,'entered: '+p.name);map.panTo(p)}
+  catch(e){say('Parade Pilot',`I couldn't look up "${esc(it.full)}". Try another place or use Pick on map.`,'asst')}
+},{gpsOption:true});
+// From / To: pick a suggestion → fill the field (From also offers GPS)
+autocomplete($('from'),it=>{ if(it.gps) return startLocation(); state.useHere=false;$('locBtn').textContent='Use my location'; },{gpsOption:true});
+autocomplete($('to'),()=>{ if(state.watching||state.useHere) plan(); });
 
 // ---------- wiring ----------
 $('plan').onclick=()=>{say('You',`${esc($('from').value)} → ${esc($('to').value)}, leaving ${$('leave').value}${$('by').value?', arrive by '+$('by').value:''}`,'user');plan()};
