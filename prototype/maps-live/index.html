@@ -10,12 +10,6 @@
 --parade:#d93025;--parade-soft:#fce8e6;--ok:#188038;--ok-soft:#e6f4ea;--warn:#b06000;--warn-soft:#fef7e0;
 --mono:"IBM Plex Mono",ui-monospace,monospace;--body:"Inter",system-ui,sans-serif}
 *{box-sizing:border-box}
-.ac{position:fixed;z-index:20;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.22);overflow:hidden;font-size:13.5px;max-height:320px;overflow-y:auto}
-.ac div{padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;gap:1px;border-bottom:1px solid #f1f3f4}
-.ac div:last-child{border-bottom:0}
-.ac div[aria-selected="true"],.ac div:hover{background:#e8f0fe}
-.ac b{font-weight:600}.ac small{color:#5f6368;font-size:12px}
-.ac .gps b{color:#1a73e8}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(--fg);background:var(--soft)}
 #map{position:absolute;inset:0}
@@ -68,6 +62,11 @@ html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(
 #sim label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;cursor:pointer}
 #gate{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(255,255,255,.92);padding:20px;text-align:center}
 #gate div{max-width:440px}
+.address-popup{position:fixed;z-index:20;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px #0003;overflow-y:auto;font:13px var(--body)}
+.address-option{padding:12px;cursor:pointer;line-height:1.4;min-height:44px}
+.address-option:hover,.address-option[aria-selected="true"]{background:var(--accent-soft)}
+.address-attribution{padding:8px 12px;font-size:12px;text-align:right;color:var(--muted);border-top:1px solid var(--line)}
+#addressStatus{font-size:12px;line-height:1.4;color:var(--muted);margin:0}
 </style>
 </head>
 <body>
@@ -75,16 +74,18 @@ html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(
 
 <aside id="panel">
   <div class="top">
+    <p style="margin:0;font-size:12px;color:var(--muted)">Workshop demo · simulated disruptions · not official navigation advice</p>
     <div class="brand">
-      <b>Maps</b>
+      <b>Parade Pilot · Demo</b>
       <span style="display:flex;gap:6px">
         <button class="chip on" id="paradeMode" aria-pressed="true"><span class="dot"></span>Parade mode</button>
         <span class="chip watch" id="watchChip" hidden><span class="dot"></span>Watching trip</span>
         <span class="chip here" id="locChip" hidden></span>
       </span>
     </div>
-    <div class="field"><span>From</span><input id="from" value="W 79th St & Amsterdam Ave, New York, NY"><button class="loc" id="locBtn" type="button">Use my location</button></div>
-    <div class="field"><span>To</span><input id="to" value="Moynihan Train Hall, New York, NY"></div>
+    <div class="field"><span>From</span><input aria-label="Starting address" aria-describedby="addressStatus" id="from" value="W 79th St & Amsterdam Ave, New York, NY"><button class="loc" id="locBtn" type="button">Use my location</button></div>
+    <div class="field"><span>To</span><input aria-label="Destination address" aria-describedby="addressStatus" id="to" value="Moynihan Train Hall, New York, NY"></div>
+    <p id="addressStatus" role="status" aria-live="polite">Loading address suggestions…</p>
     <div class="row">
       <div class="field"><span>Leave</span><input id="leave" type="time" value="09:45"></div>
       <div class="field"><span>By</span><input id="by" type="time" value="10:45"></div>
@@ -116,7 +117,7 @@ html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(
   <label><input type="checkbox" data-d="l123">1/2/3 suspended</label>
   <h4 style="margin-top:6px">My location</h4>
   <form id="hereForm" style="display:flex;gap:6px">
-    <input id="hereInput" placeholder="Type where you are" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px">
+    <input aria-label="Your current address" aria-describedby="addressStatus" id="hereInput" placeholder="Type where you are" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px">
     <button class="loc" type="submit">Set</button>
   </form>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -129,6 +130,7 @@ html,body{height:100%;margin:0;font-family:var(--body);font-size:14px;color:var(
 <div id="gate"><div id="gateMsg"></div></div>
 
 <script src="config.js"></script>
+<script src="autocomplete.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const TZ = 'America/New_York', DAY = '2026-11-26';
@@ -366,57 +368,6 @@ $('hereForm').onsubmit=async e=>{e.preventDefault();const q=$('hereInput').value
   catch(err){say('Parade Pilot',`I couldn't find "${esc(q)}". Try a street corner or a landmark, or pick the spot on the map.`,'asst')}};
 $('from').addEventListener('input',()=>{if($('from').value!=='My location'){state.useHere=false;$('locBtn').textContent='Use my location'}});
 
-// ---------- place suggestions (Places API autocomplete) ----------
-async function suggest(q,token){
-  const r=await fetch('https://places.googleapis.com/v1/places:autocomplete',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':window.PP_KEY},
-    body:JSON.stringify({input:q,sessionToken:token,locationBias:{circle:{center:{latitude:40.758,longitude:-73.985},radius:25000}}})});
-  const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
-  return (j.suggestions||[]).filter(s=>s.placePrediction).map(s=>{const p=s.placePrediction;
-    return {id:p.placeId,main:p.structuredFormat?.mainText?.text||p.text.text,sub:p.structuredFormat?.secondaryText?.text||'',full:p.text.text}});
-}
-async function placeDetails(id,token){
-  const r=await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(id)}?sessionToken=${token}`,{headers:{'X-Goog-Api-Key':window.PP_KEY,'X-Goog-FieldMask':'location,formattedAddress,displayName'}});
-  const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
-  return {lat:j.location.latitude,lng:j.location.longitude,name:j.displayName?.text||j.formattedAddress};
-}
-// Attach a suggestion dropdown to an input. onPick gets {full, main, id, gps?}.
-function autocomplete(input,onPick,{gpsOption=false}={}){
-  const box=document.createElement('div');box.className='ac';box.hidden=true;box.setAttribute('role','listbox');document.body.appendChild(box);
-  let items=[],sel=-1,timer=null,token=crypto.randomUUID(),seq=0;
-  const place=()=>{const r=input.getBoundingClientRect(),below=innerHeight-r.bottom;box.style.left=r.left+'px';box.style.width=Math.max(r.width,260)+'px';
-    if(below<240){box.style.top='';box.style.bottom=(innerHeight-r.top+4)+'px'}else{box.style.bottom='';box.style.top=(r.bottom+4)+'px'}};
-  const render=()=>{box.innerHTML=items.map((it,i)=>`<div role="option" class="${it.gps?'gps':''}" aria-selected="${i===sel}" data-i="${i}"><b>${esc(it.main)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div>`).join('');
-    box.hidden=!items.length; if(items.length) place();
-    box.querySelectorAll('[data-i]').forEach(d=>d.onmousedown=e=>{e.preventDefault();choose(+d.dataset.i)})};
-  const close=()=>{box.hidden=true;items=[];sel=-1};
-  const choose=i=>{const it=items[i];if(!it)return;close();if(!it.gps)input.value=it.full;onPick({...it,token});token=crypto.randomUUID()};
-  input.setAttribute('autocomplete','off');
-  input.addEventListener('input',()=>{clearTimeout(timer);const q=input.value.trim();
-    if(q.length<2){items=gpsOption?[{gps:true,main:'Use my current location',sub:'GPS'}]:[];sel=-1;render();return}
-    timer=setTimeout(async()=>{const my=++seq;
-      try{const res=await suggest(q,token); if(my!==seq)return;
-        items=(gpsOption?[{gps:true,main:'Use my current location',sub:'GPS'}]:[]).concat(res);sel=items.length>1&&gpsOption?1:0;render()}
-      catch(e){console.warn('Suggestions unavailable',e)}},180)});
-  input.addEventListener('focus',()=>{if(gpsOption&&!input.value.trim()){items=[{gps:true,main:'Use my current location',sub:'GPS'}];sel=0;render()}});
-  input.addEventListener('keydown',e=>{if(box.hidden)return;
-    if(e.key==='ArrowDown'){e.preventDefault();sel=(sel+1)%items.length;render()}
-    else if(e.key==='ArrowUp'){e.preventDefault();sel=(sel-1+items.length)%items.length;render()}
-    else if(e.key==='Enter'){e.preventDefault();choose(Math.max(sel,0))}
-    else if(e.key==='Escape'){close()}});
-  input.addEventListener('blur',()=>setTimeout(close,120));
-  addEventListener('resize',()=>{if(!box.hidden)place()});
-}
-
-// "My location": pick a suggestion → that becomes the traveler's position and the trip is planned from it
-autocomplete($('hereInput'),async it=>{
-  if(it.gps) return startLocation();
-  try{const p=await placeDetails(it.id,it.token);$('hereInput').value=p.name;onPosition(p.lat,p.lng,20,'entered: '+p.name);map.panTo(p)}
-  catch(e){say('Parade Pilot',`I couldn't look up "${esc(it.full)}". Try another place or use Pick on map.`,'asst')}
-},{gpsOption:true});
-// From / To: pick a suggestion → fill the field (From also offers GPS)
-autocomplete($('from'),it=>{ if(it.gps) return startLocation(); state.useHere=false;$('locBtn').textContent='Use my location'; },{gpsOption:true});
-autocomplete($('to'),()=>{ if(state.watching||state.useHere) plan(); });
-
 // ---------- wiring ----------
 $('plan').onclick=()=>{say('You',`${esc($('from').value)} → ${esc($('to').value)}, leaving ${$('leave').value}${$('by').value?', arrive by '+$('by').value:''}`,'user');plan()};
 document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const p=PRESETS[b.dataset.p];state.useHere=false;$('locBtn').textContent='Use my location';['from','to','leave','by'].forEach(k=>$(k).value=p[k]);say('You',esc(p.say),'user');plan()});
@@ -439,12 +390,21 @@ $('paradeMode').onclick=()=>{const cb=document.querySelector('[data-d="parade"]'
 function initMap(){
   map=new google.maps.Map($('map'),{center:{lat:40.765,lng:-73.982},zoom:14,mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false});
   draw(null,[]);
+  initAddressAutocomplete({
+    from: {onGPS: startLocation, onSelect: () => {state.useHere=false;$('locBtn').textContent='Use my location'}},
+    to: {onSelect: () => {if(state.watching||state.useHere) plan()}},
+    hereInput: {onGPS: startLocation, needsLocation: true, onSelect: ({text, location}) => {
+      if(!location){$('addressStatus').textContent='Position unavailable for this address. Try another result or Pick on map.';return}
+      const p={lat:location.lat(),lng:location.lng()};
+      onPosition(p.lat,p.lng,20,'entered: '+text);map.panTo(p);
+    }}
+  });
   map.addListener('click',e=>{if(!state.pickOnce&&!$('clickLoc').checked)return;
     state.pickOnce=false;$('pickBtn').textContent='Pick on map';map.setOptions({draggableCursor:null});
     onPosition(e.latLng.lat(),e.latLng.lng(),15,'picked on map')});
-  say('Parade Pilot','Parade mode is on. I know the 100th parade route, the balloon staging area and live station closures. Pick a trip above or ask me below, and I\'ll keep watching it after you leave.','asst');
+  say('Parade Pilot','Workshop demo: the parade corridor, closures and delays shown here are simulated. Google provides route candidates. Pick a trip above to explore how disruption assistance could work.','asst');
 }
-window.gm_authFailure=()=>{$('gate').style.display='flex';$('gateMsg').innerHTML='<b>Google rejected the API key.</b><br>Enable the Maps JavaScript API and Routes API for it, and allow http://localhost:8765/* if the key has website restrictions.'};
+window.gm_authFailure=()=>{$('gate').style.display='flex';$('gateMsg').innerHTML='<b>Google rejected the API key.</b><br>Check Maps JavaScript API, Places API (New), routing access, billing, and the API key’s allowed website domains. The hosted demo domain must be allowed as well as localhost.'};
 if(!window.PP_KEY){$('gate').style.display='flex';$('gateMsg').textContent='Add your key to config.js to load the map.'}
 else{const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.PP_KEY)}&callback=initMap&v=weekly`;s.async=true;document.head.appendChild(s)}
 </script>
